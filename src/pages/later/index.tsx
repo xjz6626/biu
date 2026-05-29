@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { addToast, Button, Spinner } from "@heroui/react";
-import { RiDeleteBinLine } from "@remixicon/react";
+import { RiDeleteBinLine, RiPlayCircleLine } from "@remixicon/react";
 
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { postHistoryToViewDel } from "@/service/history-toview-del";
@@ -195,6 +195,26 @@ const Later = () => {
     }
   }, []);
 
+  const handlePlayAll = useCallback(() => {
+    const playableItems = list
+      .filter(item => !item.is_pgc)
+      .map(item => ({
+        type: "mv" as const,
+        title: item.title,
+        cover: item.pic,
+        bvid: item.bvid,
+        ownerName: item.owner?.name,
+        ownerMid: item.owner?.mid,
+      }));
+
+    if (playableItems.length === 0) {
+      addToast({ title: "没有可播放的内容", color: "warning" });
+      return;
+    }
+
+    usePlayList.getState().playList(playableItems);
+  }, [list]);
+
   const handleClear = useCallback(() => {
     useModalStore.getState().onOpenConfirmModal({
       title: "删除已观看完的视频？",
@@ -218,9 +238,21 @@ const Later = () => {
       <div className="mb-2">
         <div className="flex items-center justify-between">
           <h1>稍后再看</h1>
-          <Button variant="flat" size="sm" startContent={<RiDeleteBinLine size={18} />} onPress={handleClear}>
-            清除已看完
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="flat"
+              size="sm"
+              color="primary"
+              startContent={<RiPlayCircleLine size={18} />}
+              onPress={handlePlayAll}
+              isDisabled={list.length === 0}
+            >
+              全部播放
+            </Button>
+            <Button variant="flat" size="sm" startContent={<RiDeleteBinLine size={18} />} onPress={handleClear}>
+              清除已看完
+            </Button>
+          </div>
         </div>
         <LaterSearch onSearch={handleSearch} onDateRangeChange={handleDateRangeChange} />
       </div>

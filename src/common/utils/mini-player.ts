@@ -6,7 +6,15 @@ import type { PlayMode } from "@/common/constants/audio";
 import { usePlayList } from "@/store/play-list";
 import { usePlayProgress } from "@/store/play-progress";
 
-export type MiniPlayerCommandFromMini = "init" | "seek" | "togglePlayMode" | "next" | "prev" | "togglePlay";
+export type MiniPlayerCommandFromMini =
+  | "init"
+  | "seek"
+  | "togglePlayMode"
+  | "next"
+  | "prev"
+  | "togglePlay"
+  | "setVolume"
+  | "toggleMute";
 
 export interface MiniPlayerMainStateSnapshot {
   isSingle: boolean;
@@ -17,6 +25,8 @@ export interface MiniPlayerMainStateSnapshot {
   duration: number;
   playMode?: PlayMode;
   playId?: string;
+  volume: number;
+  isMuted: boolean;
 }
 
 export interface MiniPlayerMessageFromMini {
@@ -48,7 +58,7 @@ export function createBroadcastChannel() {
 }
 
 function getMainStateSnapshot(): MiniPlayerMainStateSnapshot {
-  const { list, isPlaying, playMode, duration, playId, getPlayItem } = usePlayList.getState();
+  const { list, isPlaying, playMode, duration, playId, getPlayItem, volume, isMuted } = usePlayList.getState();
   const currentTime = usePlayProgress.getState().currentTime;
   const playItem = getPlayItem();
 
@@ -61,6 +71,8 @@ function getMainStateSnapshot(): MiniPlayerMainStateSnapshot {
     currentTime: Number(currentTime ?? 0),
     playMode,
     duration: Number(duration ?? 0),
+    volume,
+    isMuted,
   };
 }
 
@@ -106,6 +118,17 @@ function handleMessageFromMini(message: MiniPlayerMessageFromMini, channel: Broa
       usePlayList.getState().togglePlay();
       break;
     }
+    case "setVolume": {
+      const vol = data.state?.volume;
+      if (typeof vol === "number") {
+        usePlayList.getState().setVolume(vol);
+      }
+      break;
+    }
+    case "toggleMute": {
+      usePlayList.getState().toggleMute();
+      break;
+    }
     default: {
       break;
     }
@@ -140,12 +163,16 @@ function startMiniPlayerMainSync() {
           isPlaying: state.isPlaying,
           playMode: state.playMode,
           duration: state.duration,
+          volume: state.volume,
+          isMuted: state.isMuted,
         },
         {
           playId: prevState.playId,
           isPlaying: prevState.isPlaying,
           playMode: prevState.playMode,
           duration: prevState.duration,
+          volume: prevState.volume,
+          isMuted: prevState.isMuted,
         },
       )
     ) {

@@ -9,15 +9,19 @@ interface State {
   cover?: string;
   duration: number;
   playMode?: PlayMode;
+  volume: number;
+  isMuted: boolean;
 }
 
 interface Action {
-  update: (state: State) => void;
+  update: (state: Partial<State>) => void;
 }
 
 export const usePlayState = create<State & Action>(set => ({
   isPlaying: false,
   isSingle: false,
   duration: 0,
-  update: state => set(state),
+  volume: 0.5,
+  isMuted: false,
+  update: state => set(s => ({ ...s, ...state })),
 }));

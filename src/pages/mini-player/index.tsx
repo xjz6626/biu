@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, Slider } from "@heroui/react";
 import {
@@ -7,6 +7,9 @@ import {
   RiPlayCircleFill,
   RiSkipBackFill,
   RiSkipForwardFill,
+  RiVolumeDownLine,
+  RiVolumeMuteLine,
+  RiVolumeUpLine,
 } from "@remixicon/react";
 import clx from "classnames";
 import { useShallow } from "zustand/react/shallow";
@@ -87,6 +90,12 @@ const MiniPlayer = () => {
       if (typeof state.currentTime === "number") {
         setCurrentTime(state.currentTime);
       }
+      if (typeof state.volume === "number") {
+        updatePlayState({ volume: state.volume });
+      }
+      if (typeof state.isMuted === "boolean") {
+        updatePlayState({ isMuted: state.isMuted });
+      }
     };
 
     return () => {
@@ -116,9 +125,65 @@ const MiniPlayer = () => {
     postMessage("next");
   };
 
+  // 音量控制（状态从主窗口同步，命令通过 BroadcastChannel 发送）
+  const volume = usePlayState(s => s.volume);
+  const isMuted = usePlayState(s => s.isMuted);
+  const prevVolumeRef = useRef(volume);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const lastVolumeClickRef = useRef(0);
+
+  const volumeIcon = useMemo(() => {
+    if (isMuted || volume === 0) return <RiVolumeMuteLine size={18} />;
+    if (volume > 0.5) return <RiVolumeUpLine size={18} />;
+    return <RiVolumeDownLine size={18} />;
+  }, [isMuted, volume]);
+
+  const displayVolume = isMuted ? 0 : volume;
+
+  const handleVolumeSliderChange = (v: number) => {
+    const val = v as number;
+
+    // 从静音拉到非零 → 先发取消静音
+    if (isMuted && val > 0) {
+      postMessage("toggleMute");
+    }
+
+    // 拉到 0 → 保存当前音量后静音
+    if (val === 0 && !isMuted) {
+      prevVolumeRef.current = volume;
+      postMessage("toggleMute");
+    }
+
+    postMessage("setVolume", { volume: val });
+  };
+
+  const handleVolumeClick = () => {
+    const now = Date.now();
+    if (now - lastVolumeClickRef.current < 300) {
+      // 双击 → 静音切换
+      if (!isMuted) {
+        prevVolumeRef.current = volume;
+        postMessage("setVolume", { volume: 0 });
+        postMessage("toggleMute");
+      } else {
+        postMessage("setVolume", { volume: prevVolumeRef.current });
+        postMessage("toggleMute");
+      }
+      setShowVolumeSlider(false);
+      window.electron.setMiniSize(false);
+    } else {
+      // 单击 → 切换音量滑块
+      const next = !showVolumeSlider;
+      setShowVolumeSlider(next);
+      window.electron.setMiniSize(next);
+    }
+    lastVolumeClickRef.current = now;
+  };
+
   return (
-    <div className="window-drag rounded-medium flex h-screen w-screen flex-col overflow-hidden select-none">
-      <div className="flex h-full items-center">
+    <div className="window-drag rounded-medium bg-background flex h-screen w-screen flex-col overflow-hidden select-none">
+      {/* 主卡片区域 - 固定 100px */}
+      <div className="flex h-[100px] shrink-0 items-center">
         <CoverView />
         <div className="flex min-w-0 flex-1 flex-col space-y-1 px-2">
           <div className="flex min-w-0 flex-col">
@@ -161,6 +226,19 @@ const MiniPlayer = () => {
             >
               {playModeIcon}
             </Button>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              disableAnimation
+              onPress={handleVolumeClick}
+              className={clx("hover:text-primary window-no-drag", { "text-primary": showVolumeSlider })}
+              aria-label="音量"
+              title={`音量: ${Math.round(displayVolume * 100)}%`}
+            >
+              {volumeIcon}
+            </Button>
+
             <div className="flex items-center space-x-1">
               <Button
                 isDisabled={!title || isSingle}
@@ -200,6 +278,7 @@ const MiniPlayer = () => {
                 <RiSkipForwardFill size={18} />
               </Button>
             </div>
+
             <Button
               isIconOnly
               size="sm"
@@ -213,6 +292,32 @@ const MiniPlayer = () => {
           </div>
         </div>
       </div>
+
+      {/* 音量调节条 — 卡片下方 flex 行 */}
+      {showVolumeSlider && (
+        <div className="window-no-drag bg-background flex shrink-0 items-center space-x-2 border-t border-white/10 px-3 py-2">
+          <RiVolumeMuteLine size={14} className="shrink-0 text-white/50" />
+          <Slider
+            aria-label="音量"
+            color="primary"
+            radius="full"
+            size="sm"
+            value={displayVolume}
+            minValue={0}
+            maxValue={1}
+            step={0.01}
+            onChange={handleVolumeSliderChange}
+            className="flex-1"
+            classNames={{
+              track: "h-[4px]",
+              thumb: "w-3 h-3 after:hidden",
+            }}
+          />
+          <span className="w-8 shrink-0 text-right text-xs text-white/60 tabular-nums">
+            {Math.round(displayVolume * 100)}%
+          </span>
+        </div>
+      )}
     </div>
   );
 };

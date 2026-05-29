@@ -8,16 +8,23 @@ const __dirname = path.dirname(__filename);
 
 let miniPlayer: BrowserWindow | null = null;
 
+/** 记住迷你播放器的窗口位置，切换回来时恢复 */
+let savedBounds: { x: number; y: number } | null = null;
+
+const MINI_WIDTH = 320;
+const MINI_HEIGHT_DEFAULT = 100;
+const MINI_HEIGHT_EXPANDED = 140;
+
 const createMiniPlayer = () => {
   miniPlayer = new BrowserWindow({
     title: "Biu Mini Player",
     show: true,
     hasShadow: true,
-    width: 320,
-    height: 100,
-    resizable: false,
+    width: MINI_WIDTH,
+    height: MINI_HEIGHT_DEFAULT,
+    resizable: true,
     roundedCorners: false,
-    center: true,
+    center: !savedBounds,
     // 隐藏窗口标题栏和窗口按钮
     frame: false,
     transparent: true,
@@ -58,8 +65,27 @@ const createMiniPlayer = () => {
     });
   }
 
+  // 恢复上一次保存的位置
+  if (savedBounds) {
+    miniPlayer.setPosition(savedBounds.x, savedBounds.y);
+  }
+
+  // 移动时记住位置
+  miniPlayer.on("move", () => {
+    if (!miniPlayer || miniPlayer.isDestroyed()) return;
+    const [x, y] = miniPlayer.getPosition();
+    savedBounds = { x, y };
+  });
+
   const indexPath = path.resolve(__dirname, "../dist/web/index.html");
   miniPlayer.loadFile(indexPath, { hash: "mini-player" });
+};
+
+const setMiniSize = (expanded: boolean) => {
+  if (!miniPlayer || miniPlayer.isDestroyed()) return;
+  const bounds = miniPlayer.getBounds();
+  const newHeight = expanded ? MINI_HEIGHT_EXPANDED : MINI_HEIGHT_DEFAULT;
+  miniPlayer.setBounds({ x: bounds.x, y: bounds.y, width: MINI_WIDTH, height: newHeight });
 };
 
 const destroyMiniPlayer = () => {
@@ -71,4 +97,4 @@ const destroyMiniPlayer = () => {
   }
 };
 
-export { miniPlayer, createMiniPlayer, destroyMiniPlayer };
+export { miniPlayer, createMiniPlayer, destroyMiniPlayer, setMiniSize };

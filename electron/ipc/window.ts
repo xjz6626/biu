@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain } from "electron";
 
-import { createMiniPlayer, destroyMiniPlayer, miniPlayer } from "../mini-player";
+import { createMiniPlayer, destroyMiniPlayer, miniPlayer, setMiniSize } from "../mini-player";
 import { channel } from "./channel";
 
 export function registerWindowHandlers({ getMainWindow }) {
@@ -33,6 +33,10 @@ export function registerWindowHandlers({ getMainWindow }) {
   ipcMain.handle(channel.window.isFullScreen, event => {
     const win = BrowserWindow.fromWebContents(event.sender);
     return win?.isFullScreen() ?? false;
+  });
+
+  ipcMain.handle(channel.window.setMiniSize, (_event, expanded: boolean) => {
+    setMiniSize(expanded);
   });
 
   ipcMain.handle(channel.window.toggleMini, () => {

@@ -80,6 +80,9 @@ declare global {
     quitAndInstall: () => Promise<void>;
     /** 切换 mini/主窗口 */
     toggleMiniPlayer: () => Promise<void>;
+    /** 调整迷你播放器窗口高度（展开音量条时） */
+    setMiniSize: (expanded: boolean) => Promise<void>;
+
     /** 最小化窗口 */
     minimizeWindow: () => void;
     /** 最大化/还原窗口 */

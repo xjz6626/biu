@@ -177,6 +177,8 @@ const api: ElectronAPI = {
   quitAndInstall: () => ipcRenderer.invoke(channel.app.quitAndInstall),
   // 切换 mini/主窗口
   toggleMiniPlayer: () => ipcRenderer.invoke(channel.window.toggleMini),
+  // 调整迷你播放器窗口高度（展开音量条时）
+  setMiniSize: (expanded: boolean) => ipcRenderer.invoke(channel.window.setMiniSize, expanded),
   // 最小化窗口
   minimizeWindow: () => ipcRenderer.send(channel.window.minimize),
   // 最大化/还原窗口

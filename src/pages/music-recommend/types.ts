@@ -1,3 +1,5 @@
+export type RecommendItemBadge = "followedUp" | "vocaloid";
+
 export interface RecommendItem {
   id: string | number;
   aid?: number;
@@ -8,4 +10,5 @@ export interface RecommendItem {
   authorMid?: number;
   playCount?: number;
   duration?: number;
+  badges?: RecommendItemBadge[];
 }

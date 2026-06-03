@@ -8,6 +8,7 @@ import clsx from "classnames";
 import { openBiliVideoLink } from "@/common/utils/url";
 import Image from "@/components/image";
 import MusicFavButton from "@/components/music-fav-button";
+import MusicFollowButton from "@/components/music-follow-button";
 import MusicThumb from "@/components/music-thumb";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
@@ -69,18 +70,21 @@ const LeftControl = () => {
             </Chip>
           )}
         </span>
-        <span
-          className={clsx("text-foreground-500 max-w-full truncate text-sm whitespace-nowrap", {
-            "cursor-pointer hover:underline": Boolean(playItem?.ownerMid),
-          })}
-          onClick={e => {
-            if (playItem?.source === "local" || !playItem?.ownerMid) return;
-            e.stopPropagation();
-            navigate(`/user/${playItem?.ownerMid}`);
-          }}
-        >
-          {playItem?.source === "local" ? "本地音乐" : playItem?.ownerName || "未知"}
-        </span>
+        <div className="flex max-w-full min-w-0 items-center gap-3">
+          <span
+            className={clsx("text-foreground-500 min-w-0 truncate text-sm whitespace-nowrap", {
+              "cursor-pointer hover:underline": Boolean(playItem?.ownerMid),
+            })}
+            onClick={e => {
+              if (playItem?.source === "local" || !playItem?.ownerMid) return;
+              e.stopPropagation();
+              navigate(`/user/${playItem?.ownerMid}`);
+            }}
+          >
+            {playItem?.source === "local" ? "本地音乐" : playItem?.ownerName || "未知"}
+          </span>
+          {Boolean(user?.isLogin) && Boolean(playItem) && playItem?.source !== "local" && <MusicFollowButton />}
+        </div>
       </div>
       <div className="flex items-center">
         {Boolean(playItem?.hasMultiPart) && <PageListDrawer />}

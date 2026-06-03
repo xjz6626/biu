@@ -8,6 +8,7 @@ import { useUser } from "@/store/user";
 import type { RecommendItem } from "./types";
 
 import { getContextMenus } from "./menu";
+import TitleWithBadges from "./title-with-badges";
 
 interface MusicRecommendGridListProps {
   items: RecommendItem[];
@@ -33,7 +34,7 @@ const MusicRecommendGridList: React.FC<MusicRecommendGridListProps> = ({
       return (
         <MusicCard
           key={item.id}
-          title={item.title}
+          title={<TitleWithBadges title={item.title} badges={item.badges} />}
           cover={item.cover}
           playCount={item.playCount}
           duration={item.duration}

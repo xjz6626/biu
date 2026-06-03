@@ -9,35 +9,81 @@ import { channel } from "../ipc/channel";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const DEFAULT_WIDTH = 900;
+const DEFAULT_HEIGHT = 220;
+const MIN_WIDTH = 640;
+const MIN_HEIGHT = 190;
+
 const desktopLyricsStore = new Store({
   name: "desktop-lyrics-settings",
   defaults: {
-    bounds: { width: 800, height: 120 },
+    bounds: { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT },
   },
 });
 
 let desktopLyricsWindow: BrowserWindow | null = null;
 let isDesktopLyricsLocked = false;
+let keepOnTopTimer: NodeJS.Timeout | null = null;
+
+const getSavedBounds = () => {
+  const bounds = desktopLyricsStore.get("bounds") as Electron.Rectangle | undefined;
+  return {
+    height: Math.max(bounds?.height || DEFAULT_HEIGHT, MIN_HEIGHT),
+    width: Math.max(bounds?.width || DEFAULT_WIDTH, MIN_WIDTH),
+    x: bounds?.x,
+    y: bounds?.y,
+  };
+};
+
+const saveDesktopLyricsBounds = () => {
+  if (desktopLyricsWindow && !desktopLyricsWindow.isDestroyed()) {
+    desktopLyricsStore.set("bounds", desktopLyricsWindow.getBounds());
+  }
+};
+
+const applyDesktopLyricsAlwaysOnTop = () => {
+  if (!desktopLyricsWindow || desktopLyricsWindow.isDestroyed()) return;
+
+  desktopLyricsWindow.setAlwaysOnTop(true, "screen-saver", 1);
+  desktopLyricsWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  desktopLyricsWindow.moveTop();
+};
+
+const startKeepOnTopTimer = () => {
+  if (keepOnTopTimer) return;
+
+  keepOnTopTimer = setInterval(applyDesktopLyricsAlwaysOnTop, 1500);
+};
+
+const stopKeepOnTopTimer = () => {
+  if (!keepOnTopTimer) return;
+
+  clearInterval(keepOnTopTimer);
+  keepOnTopTimer = null;
+};
 
 const createDesktopLyricsWindow = () => {
-  const savedBounds = desktopLyricsStore.get("bounds") as Electron.Rectangle;
+  const savedBounds = getSavedBounds();
+  const hasSavedPosition = typeof savedBounds.x === "number" && typeof savedBounds.y === "number";
 
   desktopLyricsWindow = new BrowserWindow({
     title: "Biu Desktop Lyrics",
     show: false, // 阻止初次白屏闪烁
     backgroundColor: "#00000000", // 透明背景
-    width: savedBounds?.width || 800,
-    height: savedBounds?.height || 120,
-    x: savedBounds?.x,
-    y: savedBounds?.y,
+    width: savedBounds.width,
+    height: savedBounds.height,
+    minWidth: MIN_WIDTH,
+    minHeight: MIN_HEIGHT,
+    x: savedBounds.x,
+    y: savedBounds.y,
     resizable: true, // Allow user to resize it horizontally/vertically if needed
     roundedCorners: false,
-    center: true,
+    center: !hasSavedPosition,
     frame: false,
     transparent: true,
     hasShadow: false, // Better for lock through without shadow box
     alwaysOnTop: true,
-    type: "toolbar", // Helps with alwaysOnTop on some Linux WMs
+    type: process.platform === "linux" ? "notification" : "toolbar",
     skipTaskbar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -48,7 +94,7 @@ const createDesktopLyricsWindow = () => {
     },
   });
 
-  desktopLyricsWindow.setAlwaysOnTop(true, "screen-saver"); // Enforce top level
+  applyDesktopLyricsAlwaysOnTop();
 
   desktopLyricsWindow.webContents.setWindowOpenHandler(() => {
     return { action: "deny" };
@@ -70,16 +116,16 @@ const createDesktopLyricsWindow = () => {
 
   desktopLyricsWindow.once("ready-to-show", () => {
     desktopLyricsWindow?.show();
+    applyDesktopLyricsAlwaysOnTop();
+    startKeepOnTopTimer();
   });
 
-  const saveBounds = () => {
-    if (desktopLyricsWindow && !desktopLyricsWindow.isDestroyed()) {
-      desktopLyricsStore.set("bounds", desktopLyricsWindow.getBounds());
-    }
-  };
-
-  desktopLyricsWindow.on("move", saveBounds);
-  desktopLyricsWindow.on("resize", saveBounds);
+  desktopLyricsWindow.on("move", saveDesktopLyricsBounds);
+  desktopLyricsWindow.on("resize", saveDesktopLyricsBounds);
+  desktopLyricsWindow.on("close", saveDesktopLyricsBounds);
+  desktopLyricsWindow.on("show", applyDesktopLyricsAlwaysOnTop);
+  desktopLyricsWindow.on("focus", applyDesktopLyricsAlwaysOnTop);
+  desktopLyricsWindow.on("blur", applyDesktopLyricsAlwaysOnTop);
 
   // Set initial lock state
   updateDesktopLyricsLockStatus(false);
@@ -88,6 +134,8 @@ const createDesktopLyricsWindow = () => {
 const destroyDesktopLyricsWindow = () => {
   if (desktopLyricsWindow) {
     if (!desktopLyricsWindow.isDestroyed()) {
+      saveDesktopLyricsBounds();
+      stopKeepOnTopTimer();
       desktopLyricsWindow.destroy();
     }
     desktopLyricsWindow = null;

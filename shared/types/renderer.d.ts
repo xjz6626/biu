@@ -50,6 +50,8 @@ declare global {
     setProxySettings: (proxySettings: ProxySettings) => Promise<void>;
     /** 上报当前播放状态到主进程（用于任务栏按钮切换） */
     updatePlaybackState: (isPlaying: boolean) => void;
+    /** 从辅助窗口控制主播放器 */
+    controlPlayer: (command: "prev" | "next" | "toggle") => Promise<boolean>;
     /** 订阅主进程下发的快捷键命令 */
     onShortcutCommand: (cb: (cmd: ShortcutCommand) => void) => VoidFunction;
     /** 注册快捷键，返回是否注册成功 */

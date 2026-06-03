@@ -10,6 +10,7 @@ import { useUser } from "@/store/user";
 import type { RecommendItem } from "./types";
 
 import { getContextMenus } from "./menu";
+import TitleWithBadges from "./title-with-badges";
 
 interface MusicRecommendListProps {
   items: RecommendItem[];
@@ -60,7 +61,7 @@ const MusicRecommendList: React.FC<MusicRecommendListProps> = ({
               hidePubTime
               key={item.id}
               index={index + 1}
-              title={item.title}
+              title={<TitleWithBadges title={item.title} badges={item.badges} />}
               type="mv"
               bvid={item.bvid}
               cover={item.cover}

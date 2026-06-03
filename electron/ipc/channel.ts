@@ -46,6 +46,7 @@ export const channel = {
   },
   player: {
     state: "player:state",
+    command: "player:command",
     prev: "player:prev",
     next: "player:next",
     toggle: "player:toggle",

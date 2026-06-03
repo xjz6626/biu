@@ -6,7 +6,9 @@ import { RiPlayFill } from "@remixicon/react";
 import AsyncButton from "@/components/async-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { getMusicComprehensiveWebRank, type Data as MusicItem } from "@/service/music-comprehensive-web-rank";
+import { getIndexFeedRcmd, type WebIndexFeedRcmdItem } from "@/service/web-interface-index-feed-rcmd";
 import { getRegionFeedRcmd, type Archive } from "@/service/web-interface-region-feed-rcmd";
+import { getWebInterfaceView, type WebInterfaceViewData } from "@/service/web-interface-view";
 import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
@@ -18,12 +20,16 @@ import MusicRecommendList from "./list";
 import NewMusicTop from "./new-music-top";
 
 const PAGE_SIZE = 20;
+const INDEX_PAGE_SIZE = 20;
 const REGION_PAGE_SIZE = 15;
+const INDEX_WEB_LOCATION = 1430650;
 const REGION_WEB_LOCATION = "333.40138";
+const MUSIC_ZONE_IDS = new Set([3, 28, 29, 30, 31, 54, 59, 130, 193, 194, 243, 244, 265, 266, 267]);
+const INDEX_DETAIL_CONCURRENCY = 6;
 
-type RecommendTabKey = "music" | "guichu" | "pop";
+type RecommendTabKey = "recommend" | "music" | "guichu" | "pop";
 
-const REGION_MAP: Record<Exclude<RecommendTabKey, "pop">, number> = {
+const REGION_MAP: Record<Exclude<RecommendTabKey, "recommend" | "pop">, number> = {
   music: 1003,
   guichu: 1007,
 };
@@ -57,6 +63,53 @@ const normalizeRegionItem = (item: Archive, fallbackId: string | number): Recomm
   };
 };
 
+const normalizeViewItem = (item: WebInterfaceViewData, source?: WebIndexFeedRcmdItem): RecommendItem => {
+  const badges: RecommendItem["badges"] = [];
+  if (source?.is_followed === 1) {
+    badges.push("followedUp");
+  }
+  if (item.tid === 30) {
+    badges.push("vocaloid");
+  }
+
+  return {
+    id: item.aid ?? item.bvid,
+    aid: item.aid,
+    bvid: item.bvid,
+    title: item.title || "",
+    cover: item.pic || "",
+    author: item.owner?.name,
+    authorMid: item.owner?.mid,
+    playCount: item.stat?.view,
+    duration: item.duration,
+    badges,
+  };
+};
+
+const isMusicZoneItem = (item: WebInterfaceViewData) => {
+  if (MUSIC_ZONE_IDS.has(item.tid)) return true;
+  return item.tname?.includes("音乐") || item.tname === "MV" || item.tname === "VOCALOID·UTAU";
+};
+
+const loadMusicDetailsFromIndexFeed = async (items: WebIndexFeedRcmdItem[]) => {
+  const videos = items.filter(item => item.goto === "av" && Boolean(item.bvid));
+  const details: { detail: WebInterfaceViewData; source: WebIndexFeedRcmdItem }[] = [];
+
+  for (let i = 0; i < videos.length; i += INDEX_DETAIL_CONCURRENCY) {
+    const batch = videos.slice(i, i + INDEX_DETAIL_CONCURRENCY);
+    const results = await Promise.allSettled(batch.map(item => getWebInterfaceView({ bvid: item.bvid })));
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled" && result.value?.code === 0 && result.value.data) {
+        details.push({ detail: result.value.data, source: batch[index] });
+      }
+    });
+  }
+
+  return details
+    .filter(({ detail }) => isMusicZoneItem(detail))
+    .map(({ detail, source }) => normalizeViewItem(detail, source));
+};
+
 const MusicRecommend = () => {
   const scrollerRef = useRef<ScrollRefObject>(null);
 
@@ -65,7 +118,7 @@ const MusicRecommend = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const pageRef = useRef(1);
-  const [activeTab, setActiveTab] = useState<RecommendTabKey>("music");
+  const [activeTab, setActiveTab] = useState<RecommendTabKey>("recommend");
   const scrollRestoreRef = useRef<{ tab: RecommendTabKey; top: number } | null>(null);
   const [popLayoutVersion, setPopLayoutVersion] = useState(0);
 
@@ -82,6 +135,28 @@ const MusicRecommend = () => {
 
   const fetchPage = useCallback(
     async (pn: number = 1) => {
+      if (activeTab === "recommend") {
+        const res = await getIndexFeedRcmd({
+          feed_version: "V2",
+          fresh_idx: pn,
+          fresh_type: 4,
+          ps: INDEX_PAGE_SIZE,
+          web_location: INDEX_WEB_LOCATION,
+        });
+        const items = res?.data?.item ?? [];
+        if (res.code === 0) {
+          const normalized = await loadMusicDetailsFromIndexFeed(items);
+          setList(prev => (pn === 1 ? normalized : [...prev, ...normalized]));
+          setHasMore((res?.data?.item?.length ?? 0) >= INDEX_PAGE_SIZE);
+        } else {
+          if (pn === 1) {
+            setList([]);
+          }
+          setHasMore(false);
+        }
+        return;
+      }
+
       if (activeTab === "pop") {
         const res = await getMusicComprehensiveWebRank({ pn, ps: PAGE_SIZE, web_location: "333.1351" });
         const items = res?.data?.list ?? [];
@@ -277,6 +352,7 @@ const MusicRecommend = () => {
             setActiveTab(nextTab);
           }}
         >
+          <Tab key="recommend" title="推荐" />
           <Tab key="music" title="音乐" />
           <Tab key="guichu" title="鬼畜" />
           <Tab key="pop" title="流行" />

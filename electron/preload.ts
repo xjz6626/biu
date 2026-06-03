@@ -53,6 +53,7 @@ const api: ElectronAPI = {
       console.error("[preload] 上报播放状态失败:", error);
     }
   },
+  controlPlayer: command => ipcRenderer.invoke(channel.player.command, command),
   // 订阅主进程下发的快捷键命令
   onShortcutCommand: cb => {
     const handler = (_: Electron.IpcRendererEvent, cmd: ShortcutCommand) => {

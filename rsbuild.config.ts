@@ -46,6 +46,7 @@ export default defineConfig({
     assetPrefix: "./",
   },
   server: {
+    host: "127.0.0.1",
     port: 5678,
     strictPort: false,
     printUrls: false,

@@ -4,6 +4,8 @@ import { createMiniPlayer, destroyMiniPlayer, miniPlayer, setMiniSize } from "..
 import { toggleDesktopLyricsWindow, updateDesktopLyricsLockStatus } from "../windows/desktop-lyrics";
 import { channel } from "./channel";
 
+type PlayerCommand = "prev" | "next" | "toggle";
+
 export function registerWindowHandlers({ getMainWindow }) {
   ipcMain.on(channel.window.minimize, event => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -53,6 +55,20 @@ export function registerWindowHandlers({ getMainWindow }) {
 
   ipcMain.handle(channel.window.toggleDesktopLyrics, () => {
     toggleDesktopLyricsWindow();
+  });
+
+  ipcMain.handle(channel.player.command, (_event, command: PlayerCommand) => {
+    const mainWindow = getMainWindow?.();
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
+
+    const commandChannelMap: Record<PlayerCommand, string> = {
+      next: channel.player.next,
+      prev: channel.player.prev,
+      toggle: channel.player.toggle,
+    };
+
+    mainWindow.webContents.send(commandChannelMap[command]);
+    return true;
   });
 
   ipcMain.handle(channel.window.setDesktopLyricsLock, (_event, isLocked: boolean) => {

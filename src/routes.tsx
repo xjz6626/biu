@@ -16,6 +16,7 @@ import Search from "./pages/search";
 import Settings from "./pages/settings";
 import UserProfile from "./pages/user-profile";
 import Folder from "./pages/video-collection";
+import WeeklyRank from "./pages/weekly-rank";
 
 const routes: RouteObject[] = [
   {
@@ -37,6 +38,10 @@ const routes: RouteObject[] = [
       {
         path: "follow",
         element: <FollowList />,
+      },
+      {
+        path: "weekly-rank",
+        element: <WeeklyRank />,
       },
       {
         path: "collection/:id",

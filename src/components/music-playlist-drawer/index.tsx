@@ -4,6 +4,7 @@ import { addToast, Drawer, DrawerBody, DrawerContent, DrawerHeader } from "@hero
 import { RiDeleteBinLine, RiFocus3Line } from "@remixicon/react";
 import { uniqBy } from "es-toolkit/array";
 
+import { addToDefaultFavoriteFolder } from "@/common/utils/default-favorite";
 import { openBiliVideoLink } from "@/common/utils/url";
 import { type ScrollRefObject } from "@/components/scroll-container";
 import { VirtualList } from "@/components/virtual-list";
@@ -25,6 +26,7 @@ const PlayListDrawer = () => {
   const playId = usePlayList(s => s.playId);
   const clear = usePlayList(s => s.clear);
   const user = useUser(s => s.user);
+  const userMid = user?.mid;
   const playListItem = usePlayList(state => state.playListItem);
 
   const playItem = useMemo(() => list.find(item => item.id === playId), [list, playId]);
@@ -34,50 +36,69 @@ const PlayListDrawer = () => {
     );
   }, [list]);
 
-  const handleAction = useCallback(async (key: string, item: PlayData) => {
-    switch (key) {
-      case "favorite":
-        useModalStore.getState().onOpenFavSelectModal({
-          rid: item.id,
-          type: item.type === "mv" ? 2 : 12,
-          title: item.title,
-        });
-        break;
-      case "download-audio":
-        await window.electron.addMediaDownloadTask({
-          outputFileType: "audio",
-          title: item.title,
-          cover: item.cover,
-          bvid: item.bvid,
-          sid: item.type === "audio" ? item.id : undefined,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "download-video":
-        await window.electron.addMediaDownloadTask({
-          outputFileType: "video",
-          title: item.title,
-          cover: item.cover,
-          bvid: item.bvid,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "bililink":
-        openBiliVideoLink(item);
-        break;
-      case "del":
-        usePlayList.getState().del(item.id);
-        break;
-      default:
-        break;
-    }
-  }, []);
+  const handleAction = useCallback(
+    async (key: string, item: PlayData) => {
+      switch (key) {
+        case "favorite":
+          if (!userMid) {
+            addToast({ title: "请先登录", color: "warning" });
+            return;
+          }
+          try {
+            const res = await addToDefaultFavoriteFolder({
+              rid: item.type === "mv" ? item.aid || item.bvid || item.id : item.sid || item.id,
+              type: item.type === "mv" ? 2 : 12,
+              userMid,
+            });
+            if (res.code === 0) {
+              addToast({ title: "已添加到默认收藏夹", color: "success" });
+            } else {
+              addToast({ title: res.message || "收藏失败", color: "danger" });
+            }
+          } catch (error) {
+            addToast({
+              title: error instanceof Error ? error.message : "收藏失败",
+              color: "danger",
+            });
+          }
+          break;
+        case "download-audio":
+          await window.electron.addMediaDownloadTask({
+            outputFileType: "audio",
+            title: item.title,
+            cover: item.cover,
+            bvid: item.bvid,
+            sid: item.type === "audio" ? item.id : undefined,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "download-video":
+          await window.electron.addMediaDownloadTask({
+            outputFileType: "video",
+            title: item.title,
+            cover: item.cover,
+            bvid: item.bvid,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "bililink":
+          openBiliVideoLink(item);
+          break;
+        case "del":
+          usePlayList.getState().del(item.id);
+          break;
+        default:
+          break;
+      }
+    },
+    [userMid],
+  );
 
   const scrollToPlayItem = useCallback(() => {
     if (!playItem) {

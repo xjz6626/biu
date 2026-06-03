@@ -3,15 +3,16 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { addToast, Spinner, Tab, Tabs } from "@heroui/react";
 import { RiPlayFill } from "@remixicon/react";
 
+import { addToDefaultFavoriteFolder } from "@/common/utils/default-favorite";
 import AsyncButton from "@/components/async-button";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { getMusicComprehensiveWebRank, type Data as MusicItem } from "@/service/music-comprehensive-web-rank";
 import { getIndexFeedRcmd, type WebIndexFeedRcmdItem } from "@/service/web-interface-index-feed-rcmd";
 import { getRegionFeedRcmd, type Archive } from "@/service/web-interface-region-feed-rcmd";
 import { getWebInterfaceView, type WebInterfaceViewData } from "@/service/web-interface-view";
-import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
+import { useUser } from "@/store/user";
 
 import type { RecommendItem } from "./types";
 
@@ -123,6 +124,8 @@ const MusicRecommend = () => {
   const [popLayoutVersion, setPopLayoutVersion] = useState(0);
 
   const displayMode = useSettings(state => state.displayMode);
+  const user = useUser(state => state.user);
+  const userMid = user?.mid;
   const listKey = `${activeTab}-${displayMode}-${activeTab === "pop" ? popLayoutVersion : 0}`;
 
   const getScrollElement = useCallback(() => {
@@ -259,78 +262,97 @@ const MusicRecommend = () => {
     addToast({ title: `已添加 ${items.length} 首到播放列表`, color: "success" });
   }, [list]);
 
-  const handleMenuAction = useCallback(async (key: string, item: RecommendItem) => {
-    if (!item.bvid && key !== "favorite") {
-      addToast({ title: "暂无可播放内容", color: "warning" });
-      return;
-    }
-    switch (key) {
-      case "favorite":
-        if (!item.aid) {
-          addToast({ title: "该项目无法收藏", color: "warning" });
-          return;
-        }
-        useModalStore.getState().onOpenFavSelectModal({
-          rid: Number(item.aid),
-          type: 2,
-          title: item.title,
-        });
-        break;
-      case "play-next":
-        usePlayList.getState().addToNext({
-          type: "mv",
-          title: item.title,
-          cover: item.cover,
-          bvid: item.bvid,
-          sid: Number(item.id) || undefined,
-          ownerName: item.author,
-        });
-        break;
-      case "add-to-playlist":
-        usePlayList.getState().addList([
-          {
+  const handleMenuAction = useCallback(
+    async (key: string, item: RecommendItem) => {
+      if (!item.bvid && key !== "favorite") {
+        addToast({ title: "暂无可播放内容", color: "warning" });
+        return;
+      }
+      switch (key) {
+        case "favorite":
+          if (!item.aid) {
+            addToast({ title: "该项目无法收藏", color: "warning" });
+            return;
+          }
+          if (!userMid) {
+            addToast({ title: "请先登录", color: "warning" });
+            return;
+          }
+          try {
+            const res = await addToDefaultFavoriteFolder({
+              rid: Number(item.aid),
+              type: 2,
+              userMid,
+            });
+            if (res.code === 0) {
+              addToast({ title: "已添加到默认收藏夹", color: "success" });
+            } else {
+              addToast({ title: res.message || "收藏失败", color: "danger" });
+            }
+          } catch (error) {
+            addToast({
+              title: error instanceof Error ? error.message : "收藏失败",
+              color: "danger",
+            });
+          }
+          break;
+        case "play-next":
+          usePlayList.getState().addToNext({
             type: "mv",
             title: item.title,
             cover: item.cover,
             bvid: item.bvid,
             sid: Number(item.id) || undefined,
             ownerName: item.author,
-          },
-        ]);
-        break;
-      case "download-audio":
-        await window.electron.addMediaDownloadTask({
-          outputFileType: "audio",
-          title: item.title,
-          cover: item.cover,
-          bvid: item.bvid,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "download-video":
-        await window.electron.addMediaDownloadTask({
-          outputFileType: "video",
-          title: item.title,
-          cover: item.cover,
-          bvid: item.bvid,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "bililink":
-        if (item.bvid) {
-          window.electron.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
-        }
-        break;
-      default:
-        break;
-    }
-  }, []);
+          });
+          break;
+        case "add-to-playlist":
+          usePlayList.getState().addList([
+            {
+              type: "mv",
+              title: item.title,
+              cover: item.cover,
+              bvid: item.bvid,
+              sid: Number(item.id) || undefined,
+              ownerName: item.author,
+            },
+          ]);
+          break;
+        case "download-audio":
+          await window.electron.addMediaDownloadTask({
+            outputFileType: "audio",
+            title: item.title,
+            cover: item.cover,
+            bvid: item.bvid,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "download-video":
+          await window.electron.addMediaDownloadTask({
+            outputFileType: "video",
+            title: item.title,
+            cover: item.cover,
+            bvid: item.bvid,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "bililink":
+          if (item.bvid) {
+            window.electron.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
+          }
+          break;
+        default:
+          break;
+      }
+    },
+    [userMid],
+  );
 
   return (
     <ScrollContainer enableBackToTop ref={scrollerRef} className="h-full w-full px-4">

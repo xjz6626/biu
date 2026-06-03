@@ -5,6 +5,7 @@ import { addToast } from "@heroui/react";
 import { useRequest } from "ahooks";
 
 import { CollectionType } from "@/common/constants/collection";
+import { addToDefaultFavoriteFolder } from "@/common/utils/default-favorite";
 import ScrollContainer, { type ScrollRefObject } from "@/components/scroll-container";
 import { postFavSeasonFav } from "@/service/fav-season-fav";
 import { postFavSeasonUnfav } from "@/service/fav-season-unfav";
@@ -24,6 +25,7 @@ import SeriesList from "./list";
 const VideoCollections = () => {
   const { id } = useParams();
   const user = useUser(state => state.user);
+  const userMid = user?.mid;
   const collectedFavorites = useFavoritesStore(state => state.collectedFavorites);
   const addCollectedFavorite = useFavoritesStore(state => state.addCollectedFavorite);
   const rmCollectedFavorite = useFavoritesStore(state => state.rmCollectedFavorite);
@@ -175,11 +177,35 @@ const VideoCollections = () => {
         ]);
         break;
       case "favorite":
-        useModalStore.getState().onOpenFavSelectModal({
-          rid: item.id,
-          type: 2,
-          title: item.title,
-        });
+        if (isCreatedBySelf) {
+          useModalStore.getState().onOpenFavSelectModal({
+            rid: item.id,
+            type: 2,
+            title: item.title,
+          });
+          break;
+        }
+        if (!userMid) {
+          addToast({ title: "请先登录", color: "warning" });
+          break;
+        }
+        try {
+          const res = await addToDefaultFavoriteFolder({
+            rid: item.id,
+            type: 2,
+            userMid,
+          });
+          if (res.code === 0) {
+            addToast({ title: "已添加到默认收藏夹", color: "success" });
+          } else {
+            addToast({ title: res.message || "收藏失败", color: "danger" });
+          }
+        } catch (error) {
+          addToast({
+            title: error instanceof Error ? error.message : "收藏失败",
+            color: "danger",
+          });
+        }
         break;
       case "download-audio":
         await window.electron.addMediaDownloadTask({

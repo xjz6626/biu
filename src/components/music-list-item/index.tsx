@@ -28,7 +28,7 @@ interface Props {
   onPress?: () => void;
   playCount?: number;
   duration?: number | string;
-  index?: number;
+  index?: ReactNode;
   pubTime?: string;
   menus: ContextMenuItem[];
   onMenuAction?: (key: string) => void;

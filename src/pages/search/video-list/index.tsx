@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { addToast, Spinner } from "@heroui/react";
 
+import { addToDefaultFavoriteFolder } from "@/common/utils/default-favorite";
 import { formatUrlProtocol } from "@/common/utils/url";
 import Empty from "@/components/empty";
 import { getWebInterfaceWbiSearchType, type SearchVideoItem } from "@/service/web-interface-search-type";
-import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
+import { useUser } from "@/store/user";
 
 import GridList from "./grid-list";
 import List from "./list";
@@ -28,6 +29,8 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
   const [hasMore, setHasMore] = useState(true);
   const [initialLoading, setInitialLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const user = useUser(state => state.user);
+  const userMid = user?.mid;
 
   const fetchPage = useCallback(
     async (pn: number) => {
@@ -100,68 +103,82 @@ export default function SearchVideo({ keyword, getScrollElement }: SearchVideoPr
     addToast({ title: `已添加 ${items.length} 首到播放列表`, color: "success" });
   }, [list]);
 
-  const handleMenuAction = useCallback(async (key: string, item: SearchVideoItem) => {
-    const musicItem = {
-      type: "mv" as const,
-      bvid: item.bvid,
-      title: item.title,
-      cover: formatUrlProtocol(item.pic),
-      ownerName: item.author,
-      ownerMid: item.mid,
-    };
+  const handleMenuAction = useCallback(
+    async (key: string, item: SearchVideoItem) => {
+      const musicItem = {
+        type: "mv" as const,
+        bvid: item.bvid,
+        title: item.title,
+        cover: formatUrlProtocol(item.pic),
+        ownerName: item.author,
+        ownerMid: item.mid,
+      };
 
-    switch (key) {
-      case "play-next":
-        usePlayList.getState().addToNext(musicItem);
-        addToast({ title: "已添加到下一首播放", color: "success" });
-        break;
-      case "add-to-playlist":
-        usePlayList.getState().addList([musicItem]);
-        addToast({ title: "已添加到播放列表", color: "success" });
-        break;
-      case "favorite":
-        useModalStore.getState().onOpenFavSelectModal({
-          rid: item.aid,
-          type: 2,
-          title: (
-            <div>
-              收藏
-              <span dangerouslySetInnerHTML={{ __html: item.title }} />
-            </div>
-          ),
-        });
-        break;
-      case "download-audio":
-        await window.electron.addMediaDownloadTask({
-          outputFileType: "audio",
-          title: item.title,
-          cover: formatUrlProtocol(item.pic),
-          bvid: item.bvid,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "download-video":
-        await window.electron.addMediaDownloadTask({
-          outputFileType: "video",
-          title: item.title,
-          cover: formatUrlProtocol(item.pic),
-          bvid: item.bvid,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "bililink":
-        window.electron.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
-        break;
-      default:
-        break;
-    }
-  }, []);
+      switch (key) {
+        case "play-next":
+          usePlayList.getState().addToNext(musicItem);
+          addToast({ title: "已添加到下一首播放", color: "success" });
+          break;
+        case "add-to-playlist":
+          usePlayList.getState().addList([musicItem]);
+          addToast({ title: "已添加到播放列表", color: "success" });
+          break;
+        case "favorite":
+          if (!userMid) {
+            addToast({ title: "请先登录", color: "warning" });
+            break;
+          }
+          try {
+            const res = await addToDefaultFavoriteFolder({
+              rid: item.aid,
+              type: 2,
+              userMid,
+            });
+            if (res.code === 0) {
+              addToast({ title: "已添加到默认收藏夹", color: "success" });
+            } else {
+              addToast({ title: res.message || "收藏失败", color: "danger" });
+            }
+          } catch (error) {
+            addToast({
+              title: error instanceof Error ? error.message : "收藏失败",
+              color: "danger",
+            });
+          }
+          break;
+        case "download-audio":
+          await window.electron.addMediaDownloadTask({
+            outputFileType: "audio",
+            title: item.title,
+            cover: formatUrlProtocol(item.pic),
+            bvid: item.bvid,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "download-video":
+          await window.electron.addMediaDownloadTask({
+            outputFileType: "video",
+            title: item.title,
+            cover: formatUrlProtocol(item.pic),
+            bvid: item.bvid,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "bililink":
+          window.electron.openExternal(`https://www.bilibili.com/video/${item.bvid}`);
+          break;
+        default:
+          break;
+      }
+    },
+    [userMid],
+  );
 
   return (
     <>

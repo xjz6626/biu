@@ -5,6 +5,7 @@ import { addToast, useDisclosure } from "@heroui/react";
 import { useRequest } from "ahooks";
 
 import { CollectionType } from "@/common/constants/collection";
+import { addToDefaultFavoriteFolder } from "@/common/utils/default-favorite";
 import { getAllFavMedia } from "@/common/utils/fav";
 import { openBiliVideoLink } from "@/common/utils/url";
 import FavoritesEditModal from "@/components/favorites-edit-modal";
@@ -32,6 +33,7 @@ import FavoriteList from "./list";
 const Favorites = () => {
   const { id: favFolderId } = useParams();
   const user = useUser(state => state.user);
+  const userMid = user?.mid;
   const addCollectedFavorite = useFavoritesStore(state => state.addCollectedFavorite);
   const rmCollectedFavorite = useFavoritesStore(state => state.rmCollectedFavorite);
   const displayMode = useSettings(state => state.displayMode);
@@ -316,16 +318,40 @@ const Favorites = () => {
     async (key: string, item: FavMedia) => {
       switch (key) {
         case "favorite":
-          useModalStore.getState().onOpenFavSelectModal({
-            rid: item.id,
-            type: item.type,
-            title: item.title,
-            onSuccess: selectedIds => {
-              if (isCreatedBySelf && !selectedIds.includes(Number(favFolderId))) {
-                handleRemoveItem(item.id);
-              }
-            },
-          });
+          if (isCreatedBySelf) {
+            useModalStore.getState().onOpenFavSelectModal({
+              rid: item.id,
+              type: item.type,
+              title: item.title,
+              onSuccess: selectedIds => {
+                if (isCreatedBySelf && !selectedIds.includes(Number(favFolderId))) {
+                  handleRemoveItem(item.id);
+                }
+              },
+            });
+            break;
+          }
+          if (!userMid) {
+            addToast({ title: "请先登录", color: "warning" });
+            break;
+          }
+          try {
+            const res = await addToDefaultFavoriteFolder({
+              rid: item.id,
+              type: item.type as 2 | 12,
+              userMid,
+            });
+            if (res.code === 0) {
+              addToast({ title: "已添加到默认收藏夹", color: "success" });
+            } else {
+              addToast({ title: res.message || "收藏失败", color: "danger" });
+            }
+          } catch (error) {
+            addToast({
+              title: error instanceof Error ? error.message : "收藏失败",
+              color: "danger",
+            });
+          }
           break;
         case "cancelFavorite":
           useModalStore.getState().onOpenConfirmModal({
@@ -429,7 +455,7 @@ const Favorites = () => {
           break;
       }
     },
-    [favFolderId, isCreatedBySelf, handleRemoveItem, refreshInfo],
+    [favFolderId, handleRemoveItem, isCreatedBySelf, refreshInfo, userMid],
   );
 
   return (

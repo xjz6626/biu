@@ -11,6 +11,8 @@ import {
   RiCalendarScheduleFill,
   RiFolderMusicLine,
   RiFolderMusicFill,
+  RiBarChartBoxLine,
+  RiBarChartBoxFill,
 } from "@remixicon/react";
 
 import { type MenuItemProps } from "@/components/menu/menu-item";
@@ -28,6 +30,12 @@ export const DefaultMenuList: (MenuItemProps & { needLogin?: boolean })[] = [
     needLogin: true,
     icon: RiUserFollowLine,
     activeIcon: RiUserFollowFill,
+  },
+  {
+    title: "榜单记录",
+    href: "/weekly-rank",
+    icon: RiBarChartBoxLine,
+    activeIcon: RiBarChartBoxFill,
   },
   {
     title: "稍后再看",

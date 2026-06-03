@@ -4,12 +4,13 @@ import { useParams } from "react-router";
 import { addToast, Spinner } from "@heroui/react";
 import { RiPlayFill } from "@remixicon/react";
 
+import { addToDefaultFavoriteFolder } from "@/common/utils/default-favorite";
 import AsyncButton from "@/components/async-button";
 import SearchWithSort from "@/components/search-with-sort";
 import { getSpaceWbiArcSearch, type SpaceArcVListItem } from "@/service/space-wbi-arc-search";
-import { useModalStore } from "@/store/modal";
 import { usePlayList } from "@/store/play-list";
 import { useSettings } from "@/store/settings";
+import { useUser } from "@/store/user";
 
 import PostGridList from "./grid-list";
 import PostList from "./list";
@@ -21,6 +22,8 @@ interface VideoPostProps {
 const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
   const { id } = useParams();
   const displayMode = useSettings(state => state.displayMode);
+  const user = useUser(state => state.user);
+  const userMid = user?.mid;
 
   const [keyword, setKeyword] = useState("");
   const [order, setOrder] = useState("pubdate");
@@ -95,63 +98,82 @@ const VideoPost: React.FC<VideoPostProps> = ({ getScrollElement }) => {
     }
   }, [loadingMore, hasMore, fetchData]);
 
-  const handleMenuAction = useCallback((key: string, item: SpaceArcVListItem) => {
-    switch (key) {
-      case "play-next":
-        usePlayList.getState().addToNext({
-          type: "mv",
-          title: item.title,
-          cover: item.pic,
-          bvid: item.bvid,
-          ownerName: item.author,
-          ownerMid: item.mid,
-        });
-        break;
-      case "add-to-playlist":
-        usePlayList.getState().addList([
-          {
+  const handleMenuAction = useCallback(
+    async (key: string, item: SpaceArcVListItem) => {
+      switch (key) {
+        case "play-next":
+          usePlayList.getState().addToNext({
             type: "mv",
             title: item.title,
             cover: item.pic,
             bvid: item.bvid,
             ownerName: item.author,
             ownerMid: item.mid,
-          },
-        ]);
-        break;
-      case "download-audio":
-        window.electron?.addMediaDownloadTask({
-          outputFileType: "audio",
-          title: item.title,
-          cover: item.pic,
-          bvid: item.bvid,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "download-video":
-        window.electron?.addMediaDownloadTask({
-          outputFileType: "video",
-          title: item.title,
-          cover: item.pic,
-          bvid: item.bvid,
-        });
-        addToast({
-          title: "已添加下载任务",
-          color: "success",
-        });
-        break;
-      case "favorite":
-        useModalStore.getState().onOpenFavSelectModal({
-          rid: item.aid,
-          type: 2,
-          title: item.title,
-        });
-        break;
-    }
-  }, []);
+          });
+          break;
+        case "add-to-playlist":
+          usePlayList.getState().addList([
+            {
+              type: "mv",
+              title: item.title,
+              cover: item.pic,
+              bvid: item.bvid,
+              ownerName: item.author,
+              ownerMid: item.mid,
+            },
+          ]);
+          break;
+        case "download-audio":
+          window.electron?.addMediaDownloadTask({
+            outputFileType: "audio",
+            title: item.title,
+            cover: item.pic,
+            bvid: item.bvid,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "download-video":
+          window.electron?.addMediaDownloadTask({
+            outputFileType: "video",
+            title: item.title,
+            cover: item.pic,
+            bvid: item.bvid,
+          });
+          addToast({
+            title: "已添加下载任务",
+            color: "success",
+          });
+          break;
+        case "favorite":
+          if (!userMid) {
+            addToast({ title: "请先登录", color: "warning" });
+            break;
+          }
+          try {
+            const res = await addToDefaultFavoriteFolder({
+              rid: item.aid,
+              type: 2,
+              userMid,
+            });
+            if (res.code === 0) {
+              addToast({ title: "已添加到默认收藏夹", color: "success" });
+            } else {
+              addToast({ title: res.message || "收藏失败", color: "danger" });
+            }
+          } catch (error) {
+            addToast({
+              title: error instanceof Error ? error.message : "收藏失败",
+              color: "danger",
+            });
+          }
+          break;
+      }
+    },
+    [userMid],
+  );
 
   const handlePlayAll = useCallback(async () => {
     if (!id) {

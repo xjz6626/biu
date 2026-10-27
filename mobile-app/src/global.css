@@ -1,0 +1,9 @@
+:root {
+  --font-display:
+    spline sans, inter, ui-sans-serif, system-ui, sans-serif, apple color emoji, segoe ui emoji,
+    segoe ui symbol, noto color emoji;
+  --font-mono:
+    ui-monospace, sfmono-regular, menlo, monaco, consolas, liberation mono, courier new, monospace;
+  --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', meiryo, 'MS PGothic', sans-serif;
+  --font-serif: georgia, 'Times New Roman', serif;
+}
